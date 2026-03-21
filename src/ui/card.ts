@@ -99,9 +99,10 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   }
 
   // Cycle time for done cards
-  if (settings.showCycleTime && ctx.columnType === 'done' && aging.daysSinceCreated > 0) {
+  if (settings.showCycleTime && ctx.columnType === 'done') {
     hasFooter = true;
-    footer.appendChild(badge(`${aging.daysSinceCreated}d`, 'gk-cycle-time'));
+    const days = aging.daysSinceCreated;
+    footer.appendChild(badge(days === 0 ? '<1d' : `${days}d`, 'gk-cycle-time'));
   }
 
   if (hasFooter) cardEl.appendChild(footer);

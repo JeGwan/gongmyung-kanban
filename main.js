@@ -288,7 +288,7 @@ function applyLifecycleTransition(card, fromType, toType) {
   } else if (toType === "done") {
     if (!lc.started) lc.started = now;
     lc.completed = now;
-  } else if (toType === "inbox" && fromType === "done") {
+  } else if (toType === "inbox") {
     delete lc.started;
     delete lc.completed;
   }
@@ -413,9 +413,10 @@ async function renderCard(card, ctx) {
       footer.appendChild(badge(`${days}d`, "gk-aging-warm"));
     }
   }
-  if (settings.showCycleTime && ctx.columnType === "done" && aging.daysSinceCreated > 0) {
+  if (settings.showCycleTime && ctx.columnType === "done") {
     hasFooter = true;
-    footer.appendChild(badge(`${aging.daysSinceCreated}d`, "gk-cycle-time"));
+    const days = aging.daysSinceCreated;
+    footer.appendChild(badge(days === 0 ? "<1d" : `${days}d`, "gk-cycle-time"));
   }
   if (hasFooter) cardEl.appendChild(footer);
   cardEl.addEventListener("contextmenu", (e) => {
@@ -769,17 +770,19 @@ async function renderColumn(col, colIdx, app, sourcePath, component, callbacks, 
   colEl.appendChild(bodyEl);
   return colEl;
 }
+var _dragTitle = "";
 function setupDropZone(bodyEl, colIdx, callbacks) {
   bodyEl.addEventListener("dragover", (e) => {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    const indicator = bodyEl.querySelector(".gk-drop-indicator");
-    if (!indicator) {
-      const ind2 = el("div", { class: "gk-drop-indicator" });
-      bodyEl.appendChild(ind2);
+    let ind = bodyEl.querySelector(".gk-drop-indicator");
+    if (!ind) {
+      ind = el("div", { class: "gk-drop-indicator" });
+      const title = e.dataTransfer?.types.includes("text/x-gk-title") ? _dragTitle : "";
+      if (title) ind.textContent = title;
+      bodyEl.appendChild(ind);
     }
     const target = getDropTarget(bodyEl, e.clientY);
-    const ind = bodyEl.querySelector(".gk-drop-indicator");
     if (target) {
       bodyEl.insertBefore(ind, target);
     } else {
@@ -825,12 +828,16 @@ function enableCardDrag(cardEl) {
     if (!e.dataTransfer) return;
     e.dataTransfer.setData("text/x-gk-col", cardEl.dataset.colIndex ?? "");
     e.dataTransfer.setData("text/x-gk-card", cardEl.dataset.cardIndex ?? "");
+    e.dataTransfer.setData("text/x-gk-title", "1");
     e.dataTransfer.effectAllowed = "move";
+    const titleEl = cardEl.querySelector(".gk-card-title");
+    _dragTitle = titleEl?.textContent?.trim() ?? "";
     cardEl.classList.add("gk-dragging");
     requestAnimationFrame(() => cardEl.classList.add("gk-dragging"));
   });
   cardEl.addEventListener("dragend", () => {
     cardEl.classList.remove("gk-dragging");
+    _dragTitle = "";
   });
 }
 

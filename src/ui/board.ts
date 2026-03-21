@@ -207,21 +207,27 @@ async function renderColumn(
 
 // ─── Drag & Drop ───
 
+// Shared drag title for ghost card preview
+let _dragTitle = '';
+
 function setupDropZone(bodyEl: HTMLElement, colIdx: number, callbacks: BoardCallbacks): void {
   bodyEl.addEventListener('dragover', (e: DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 
-    // Show drop indicator
-    const indicator = bodyEl.querySelector('.gk-drop-indicator');
-    if (!indicator) {
-      const ind = el('div', { class: 'gk-drop-indicator' });
+    // Show drop indicator (card-shaped ghost)
+    let ind = bodyEl.querySelector('.gk-drop-indicator') as HTMLElement | null;
+    if (!ind) {
+      ind = el('div', { class: 'gk-drop-indicator' });
+      // Copy title from dragged card for preview
+      const title = e.dataTransfer?.types.includes('text/x-gk-title')
+        ? _dragTitle : '';
+      if (title) ind.textContent = title;
       bodyEl.appendChild(ind);
     }
 
     // Position indicator
     const target = getDropTarget(bodyEl, e.clientY);
-    const ind = bodyEl.querySelector('.gk-drop-indicator')!;
     if (target) {
       bodyEl.insertBefore(ind, target);
     } else {
@@ -279,13 +285,17 @@ export function enableCardDrag(cardEl: HTMLElement): void {
     if (!e.dataTransfer) return;
     e.dataTransfer.setData('text/x-gk-col', cardEl.dataset.colIndex ?? '');
     e.dataTransfer.setData('text/x-gk-card', cardEl.dataset.cardIndex ?? '');
+    e.dataTransfer.setData('text/x-gk-title', '1'); // flag for type check
     e.dataTransfer.effectAllowed = 'move';
+    // Store title for ghost preview
+    const titleEl = cardEl.querySelector('.gk-card-title');
+    _dragTitle = titleEl?.textContent?.trim() ?? '';
     cardEl.classList.add('gk-dragging');
-    // Needed for Firefox
     requestAnimationFrame(() => cardEl.classList.add('gk-dragging'));
   });
 
   cardEl.addEventListener('dragend', () => {
     cardEl.classList.remove('gk-dragging');
+    _dragTitle = '';
   });
 }

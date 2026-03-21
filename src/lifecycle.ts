@@ -26,13 +26,13 @@ export function applyLifecycleTransition(
 
   if (toType === 'active' && fromType !== 'active') {
     if (!lc.started) lc.started = now;
-    // Reopened from done
+    // Reopened from done — clear completed
     if (fromType === 'done') delete lc.completed;
   } else if (toType === 'done') {
     if (!lc.started) lc.started = now;
     lc.completed = now;
-  } else if (toType === 'inbox' && fromType === 'done') {
-    // Full reset
+  } else if (toType === 'inbox') {
+    // Moving back to inbox from any column — full reset
     delete lc.started;
     delete lc.completed;
   }
