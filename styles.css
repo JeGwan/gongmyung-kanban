@@ -1,0 +1,456 @@
+/* ─── Gongmyung Kanban ─── */
+
+/* Wrapper */
+.gk-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Header memo */
+.gk-header-memo {
+  padding: 10px 16px 6px;
+  flex-shrink: 0;
+}
+.gk-header-preview {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  line-height: 1.5;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.gk-header-preview:hover {
+  border-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.gk-header-preview p {
+  margin: 2px 0;
+}
+.gk-header-empty {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.gk-header-edit {
+  width: 100%;
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  font-family: inherit;
+  color: var(--text-normal);
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  min-height: 32px;
+}
+
+/* Board layout */
+.gk-board {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  align-items: flex-start;
+}
+
+/* Thin transparent-track scrollbar for board */
+.gk-board::-webkit-scrollbar {
+  height: 6px;
+}
+.gk-board::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gk-board::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 3px;
+}
+.gk-board::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* Column */
+.gk-column {
+  min-width: 250px;
+  max-width: 288px;
+  max-height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.gk-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.gk-column-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  flex: 1;
+}
+
+.gk-column-count {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.gk-column-add-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.gk-column-add-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.gk-column-add-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.gk-column-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 40px;
+}
+
+/* Thin scrollbar for column body */
+.gk-column-body::-webkit-scrollbar {
+  width: 4px;
+}
+.gk-column-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gk-column-body::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+}
+.gk-column-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* Card */
+.gk-card {
+  background: var(--background-primary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: grab;
+  border: 1px solid var(--background-modifier-border);
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+  font-size: 0.85em;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+}
+.gk-card:hover {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+.gk-card.gk-dragging {
+  opacity: 0.3;
+}
+.gk-card.gk-overdue {
+  border-left: 3px solid var(--text-error);
+}
+
+.gk-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.gk-card-checkbox {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.gk-card-title {
+  flex: 1;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.gk-card-title p {
+  margin: 0;
+}
+.gk-card-title a.internal-link {
+  color: var(--link-color);
+}
+
+.gk-card-body {
+  margin-top: 4px;
+  padding-left: 0;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.gk-card-body p {
+  margin: 2px 0;
+}
+
+/* Card footer */
+.gk-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-left: 0;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.gk-card-due {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--background-secondary);
+}
+.gk-card-due.gk-due-urgent {
+  background: rgba(var(--color-red-rgb), 0.15);
+  color: var(--text-error);
+  font-weight: 600;
+}
+.gk-card-due.gk-overdue {
+  background: rgba(var(--color-red-rgb), 0.2);
+  color: var(--text-error);
+  font-weight: 600;
+}
+
+.gk-card-source {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+  line-height: 1.2;
+}
+.gk-card-source p {
+  margin: 0;
+}
+.gk-card-source a.internal-link {
+  color: var(--text-faint);
+  text-decoration: none;
+}
+.gk-card-source a.internal-link:hover {
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
+/* Badges */
+.gk-badge {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.gk-aging-warm {
+  background: rgba(var(--color-yellow-rgb), 0.2);
+  color: var(--color-yellow);
+}
+.gk-aging-hot {
+  background: rgba(var(--color-orange-rgb), 0.2);
+  color: var(--color-orange);
+}
+.gk-aging-critical {
+  background: rgba(var(--color-red-rgb), 0.2);
+  color: var(--text-error);
+}
+.gk-cycle-time {
+  background: rgba(var(--color-green-rgb), 0.2);
+  color: var(--color-green);
+}
+
+/* WIP exceeded */
+.gk-wip-badge {
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+.gk-wip-exceeded .gk-column-header {
+  background: rgba(var(--color-red-rgb), 0.08);
+}
+.gk-wip-exceeded .gk-wip-badge {
+  color: var(--text-error);
+  font-weight: 600;
+}
+
+/* Drop indicator */
+.gk-drop-indicator {
+  height: 2px;
+  background: var(--interactive-accent);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Inline editor */
+.gk-card-edit {
+  width: 100%;
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.85em;
+  font-family: inherit;
+  color: var(--text-normal);
+  resize: none;
+  outline: none;
+  overflow: hidden;
+  min-height: 28px;
+}
+.gk-card-edit::placeholder {
+  color: var(--text-faint);
+}
+
+/* ─── Date Picker ─── */
+.gk-date-picker {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  width: 240px;
+  font-size: 0.85em;
+}
+
+.gk-dp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gk-dp-title {
+  font-weight: 600;
+  font-size: 0.95em;
+}
+.gk-dp-nav {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.gk-dp-nav:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gk-dp-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
+.gk-dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.gk-dp-cell {
+  background: none;
+  border: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+.gk-dp-cell:hover {
+  background: var(--background-modifier-hover);
+}
+.gk-dp-empty {
+  cursor: default;
+}
+.gk-dp-today {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+.gk-dp-selected {
+  background: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+  border-radius: 4px;
+}
+
+.gk-dp-quick {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 8px;
+}
+.gk-dp-quick-btn {
+  flex: 1;
+  background: var(--background-secondary);
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.8em;
+}
+.gk-dp-quick-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ─── Archive ─── */
+.gk-archive {
+  padding: 8px 16px 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.gk-archive-header {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.gk-archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gk-archive-item {
+  font-size: 0.8em;
+  color: var(--text-faint);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-decoration: line-through;
+}
+.gk-archive-item:hover {
+  background: var(--background-secondary);
+}
