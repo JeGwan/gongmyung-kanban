@@ -21,7 +21,8 @@ export async function renderBoard(
   sourcePath: string,
   component: Component,
   callbacks: BoardCallbacks,
-  settings: GKSettings
+  settings: GKSettings,
+  showArchiveColumn = false
 ): Promise<void> {
   container.empty();
 
@@ -41,31 +42,37 @@ export async function renderBoard(
     boardEl.appendChild(colEl);
   }
 
-  wrapper.appendChild(boardEl);
-
-  // Archive section
-  if (settings.showArchive && board.archive.length > 0) {
-    const archiveEl = renderArchive(board.archive);
-    wrapper.appendChild(archiveEl);
+  // Archive column (read-only, no drag-drop)
+  if (showArchiveColumn && board.archive.length > 0) {
+    const archiveCol = renderArchiveColumn(board.archive);
+    boardEl.appendChild(archiveCol);
   }
 
+  wrapper.appendChild(boardEl);
   container.appendChild(wrapper);
 }
 
-function renderArchive(cards: Card[]): HTMLElement {
-  const container = el('div', { class: 'gk-archive' });
-  const header = el('div', { class: 'gk-archive-header' });
-  header.textContent = `Archive (${cards.length})`;
-  container.appendChild(header);
+function renderArchiveColumn(cards: Card[]): HTMLElement {
+  const colEl = el('div', { class: 'gk-column gk-archive-column' });
 
-  const list = el('div', { class: 'gk-archive-list' });
+  const headerEl = el('div', { class: 'gk-column-header' });
+  const titleEl = el('span', { class: 'gk-column-title', text: `📦 Archive` });
+  headerEl.appendChild(titleEl);
+  const countEl = el('span', { class: 'gk-column-count', text: String(cards.length) });
+  headerEl.appendChild(countEl);
+  colEl.appendChild(headerEl);
+
+  const bodyEl = el('div', { class: 'gk-column-body' });
   for (const card of cards) {
-    const item = el('div', { class: 'gk-archive-item' });
-    item.textContent = card.title;
-    list.appendChild(item);
+    const cardEl = el('div', { class: 'gk-card gk-archive-card' });
+    const titleDiv = el('div', { class: 'gk-card-title' });
+    titleDiv.textContent = card.title;
+    cardEl.appendChild(titleDiv);
+    bodyEl.appendChild(cardEl);
   }
-  container.appendChild(list);
-  return container;
+  colEl.appendChild(bodyEl);
+
+  return colEl;
 }
 
 async function renderHeaderMemo(

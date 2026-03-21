@@ -13,10 +13,31 @@ export const VIEW_TYPE_KANBAN = 'gongmyung-kanban';
 export class KanbanView extends TextFileView {
   plugin: GongmyungKanbanPlugin;
   private board: Board | null = null;
+  private showArchiveColumn = false;
 
   constructor(leaf: WorkspaceLeaf, plugin: GongmyungKanbanPlugin) {
     super(leaf);
     this.plugin = plugin;
+
+    // Action buttons (top-right of view header)
+    this.addAction('archive', t('action.archive'), () => {
+      this.archiveDoneCards();
+    });
+
+    this.addAction('columns-3', t('action.toggle_archive'), () => {
+      this.showArchiveColumn = !this.showArchiveColumn;
+      void this.render();
+    });
+
+    this.addAction('file-text', t('action.toggle_markdown'), () => {
+      if (this.file) {
+        this.plugin.markdownOverrides.add(this.file.path);
+        void this.leaf.setViewState({
+          type: 'markdown',
+          state: { file: this.file.path },
+        });
+      }
+    });
   }
 
   get settings(): GKSettings {
@@ -97,7 +118,8 @@ export class KanbanView extends TextFileView {
       this.file.path,
       this,
       callbacks,
-      this.settings
+      this.settings,
+      this.showArchiveColumn
     );
 
     // Enable drag on all card elements
@@ -110,15 +132,13 @@ export class KanbanView extends TextFileView {
   }
 
   private updateBoardHeight(): void {
-    const wrapper = this.contentEl.querySelector('.gk-wrapper') as HTMLElement;
     const board = this.contentEl.querySelector('.gk-board') as HTMLElement;
     const headerMemo = this.contentEl.querySelector('.gk-header-memo') as HTMLElement;
-    if (!wrapper || !board) return;
+    if (!board) return;
 
     const viewHeight = this.contentEl.clientHeight;
     const headerHeight = headerMemo ? headerMemo.offsetHeight : 0;
-    const boardHeight = viewHeight - headerHeight;
-    board.style.maxHeight = `${boardHeight}px`;
+    board.style.maxHeight = `${viewHeight - headerHeight}px`;
   }
 
   onResize(): void {

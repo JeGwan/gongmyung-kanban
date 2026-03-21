@@ -425,32 +425,18 @@
   color: var(--text-normal);
 }
 
-/* ─── Archive ─── */
-.gk-archive {
-  padding: 8px 16px 16px;
-  border-top: 1px solid var(--background-modifier-border);
-  flex-shrink: 0;
-  max-height: 200px;
-  overflow-y: auto;
+/* ─── Archive Column ─── */
+.gk-archive-column {
+  opacity: 0.7;
 }
-.gk-archive-header {
-  font-size: 0.85em;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+.gk-archive-column .gk-column-header {
+  background: var(--background-modifier-border-hover, var(--background-secondary));
 }
-.gk-archive-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.gk-archive-card {
+  cursor: default !important;
+  opacity: 0.6;
 }
-.gk-archive-item {
-  font-size: 0.8em;
-  color: var(--text-faint);
-  padding: 2px 8px;
-  border-radius: 4px;
+.gk-archive-card .gk-card-title {
   text-decoration: line-through;
-}
-.gk-archive-item:hover {
-  background: var(--background-secondary);
+  color: var(--text-muted);
 }

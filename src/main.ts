@@ -8,6 +8,8 @@ import { setLanguage, t } from './i18n';
 
 export default class GongmyungKanbanPlugin extends Plugin {
   settings: GKSettings = DEFAULT_SETTINGS;
+  /** Files the user explicitly chose to view as markdown (not kanban) */
+  markdownOverrides = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -36,6 +38,18 @@ export default class GongmyungKanbanPlugin extends Plugin {
       })
     );
 
+    // Clear markdown override when a leaf is closed
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => {
+        // Prune overrides for files no longer open in any leaf
+        for (const path of this.markdownOverrides) {
+          const found = this.app.workspace.getLeavesOfType('markdown')
+            .some(leaf => (leaf.view as MarkdownView).file?.path === path);
+          if (!found) this.markdownOverrides.delete(path);
+        }
+      })
+    );
+
     // ─── Commands ───
 
     this.addCommand({
@@ -60,6 +74,7 @@ export default class GongmyungKanbanPlugin extends Plugin {
         const view = this.app.workspace.getActiveViewOfType(KanbanView);
         if (view) return false;
         if (checking) return true;
+        this.markdownOverrides.delete(file.path);
         const leaf = this.app.workspace.getMostRecentLeaf();
         if (leaf) {
           void leaf.setViewState({
@@ -81,6 +96,7 @@ export default class GongmyungKanbanPlugin extends Plugin {
         const leaf = view.leaf;
         const file = view.file;
         if (leaf && file) {
+          this.markdownOverrides.add(file.path);
           void leaf.setViewState({
             type: 'markdown',
             state: { file: file.path },
@@ -119,6 +135,9 @@ export default class GongmyungKanbanPlugin extends Plugin {
   }
 
   private async tryOpenAsKanban(file: TFile): Promise<void> {
+    // Skip if user explicitly chose markdown mode for this file
+    if (this.markdownOverrides.has(file.path)) return;
+
     const cache = this.app.metadataCache.getFileCache(file);
     if (cache?.frontmatter?.['gongmyung-kanban'] !== 'board') return;
 

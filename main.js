@@ -437,6 +437,19 @@ function formatDueDate(date, format) {
 
 // src/i18n.ts
 var strings = {
+  // Action buttons
+  "action.archive": {
+    ko: "\uC644\uB8CC \uCE74\uB4DC \uC544\uCE74\uC774\uBE0C",
+    en: "Archive completed cards"
+  },
+  "action.toggle_archive": {
+    ko: "\uC544\uCE74\uC774\uBE0C \uCEEC\uB7FC \uD1A0\uAE00",
+    en: "Toggle archive column"
+  },
+  "action.toggle_markdown": {
+    ko: "\uBB38\uC11C \uBAA8\uB4DC\uB85C \uC804\uD658",
+    en: "Open as markdown"
+  },
   // Notices
   "notice.wip_exceeded": {
     ko: "\u26A0\uFE0F WIP \uC81C\uD55C \uCD08\uACFC: {col} ({count}/{limit})",
@@ -630,7 +643,7 @@ function t(key, vars) {
 }
 
 // src/ui/board.ts
-async function renderBoard(container, board, app, sourcePath, component, callbacks, settings) {
+async function renderBoard(container, board, app, sourcePath, component, callbacks, settings, showArchiveColumn = false) {
   container.empty();
   const wrapper = el("div", { class: "gk-wrapper" });
   if (board.headerText !== void 0) {
@@ -643,26 +656,31 @@ async function renderBoard(container, board, app, sourcePath, component, callbac
     const colEl = await renderColumn(col, colIdx, app, sourcePath, component, callbacks, settings);
     boardEl.appendChild(colEl);
   }
-  wrapper.appendChild(boardEl);
-  if (settings.showArchive && board.archive.length > 0) {
-    const archiveEl = renderArchive(board.archive);
-    wrapper.appendChild(archiveEl);
+  if (showArchiveColumn && board.archive.length > 0) {
+    const archiveCol = renderArchiveColumn(board.archive);
+    boardEl.appendChild(archiveCol);
   }
+  wrapper.appendChild(boardEl);
   container.appendChild(wrapper);
 }
-function renderArchive(cards) {
-  const container = el("div", { class: "gk-archive" });
-  const header = el("div", { class: "gk-archive-header" });
-  header.textContent = `Archive (${cards.length})`;
-  container.appendChild(header);
-  const list = el("div", { class: "gk-archive-list" });
+function renderArchiveColumn(cards) {
+  const colEl = el("div", { class: "gk-column gk-archive-column" });
+  const headerEl = el("div", { class: "gk-column-header" });
+  const titleEl = el("span", { class: "gk-column-title", text: `\u{1F4E6} Archive` });
+  headerEl.appendChild(titleEl);
+  const countEl = el("span", { class: "gk-column-count", text: String(cards.length) });
+  headerEl.appendChild(countEl);
+  colEl.appendChild(headerEl);
+  const bodyEl = el("div", { class: "gk-column-body" });
   for (const card of cards) {
-    const item = el("div", { class: "gk-archive-item" });
-    item.textContent = card.title;
-    list.appendChild(item);
+    const cardEl = el("div", { class: "gk-card gk-archive-card" });
+    const titleDiv = el("div", { class: "gk-card-title" });
+    titleDiv.textContent = card.title;
+    cardEl.appendChild(titleDiv);
+    bodyEl.appendChild(cardEl);
   }
-  container.appendChild(list);
-  return container;
+  colEl.appendChild(bodyEl);
+  return colEl;
 }
 async function renderHeaderMemo(text, app, sourcePath, component, callbacks) {
   const container = el("div", { class: "gk-header-memo" });
@@ -1049,9 +1067,26 @@ var VIEW_TYPE_KANBAN = "gongmyung-kanban";
 var KanbanView = class extends import_obsidian3.TextFileView {
   plugin;
   board = null;
+  showArchiveColumn = false;
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
+    this.addAction("archive", t("action.archive"), () => {
+      this.archiveDoneCards();
+    });
+    this.addAction("columns-3", t("action.toggle_archive"), () => {
+      this.showArchiveColumn = !this.showArchiveColumn;
+      void this.render();
+    });
+    this.addAction("file-text", t("action.toggle_markdown"), () => {
+      if (this.file) {
+        this.plugin.markdownOverrides.add(this.file.path);
+        void this.leaf.setViewState({
+          type: "markdown",
+          state: { file: this.file.path }
+        });
+      }
+    });
   }
   get settings() {
     return this.plugin.settings;
@@ -1118,7 +1153,8 @@ var KanbanView = class extends import_obsidian3.TextFileView {
       this.file.path,
       this,
       callbacks,
-      this.settings
+      this.settings,
+      this.showArchiveColumn
     );
     this.contentEl.querySelectorAll(".gk-card").forEach((cardEl) => {
       enableCardDrag(cardEl);
@@ -1126,14 +1162,12 @@ var KanbanView = class extends import_obsidian3.TextFileView {
     this.updateBoardHeight();
   }
   updateBoardHeight() {
-    const wrapper = this.contentEl.querySelector(".gk-wrapper");
     const board = this.contentEl.querySelector(".gk-board");
     const headerMemo = this.contentEl.querySelector(".gk-header-memo");
-    if (!wrapper || !board) return;
+    if (!board) return;
     const viewHeight = this.contentEl.clientHeight;
     const headerHeight = headerMemo ? headerMemo.offsetHeight : 0;
-    const boardHeight = viewHeight - headerHeight;
-    board.style.maxHeight = `${boardHeight}px`;
+    board.style.maxHeight = `${viewHeight - headerHeight}px`;
   }
   onResize() {
     this.updateBoardHeight();
@@ -1536,6 +1570,8 @@ var CreateBoardModal = class extends import_obsidian5.Modal {
 // src/main.ts
 var GongmyungKanbanPlugin = class extends import_obsidian6.Plugin {
   settings = DEFAULT_SETTINGS;
+  /** Files the user explicitly chose to view as markdown (not kanban) */
+  markdownOverrides = /* @__PURE__ */ new Set();
   async onload() {
     await this.loadSettings();
     setLanguage(this.settings.language);
@@ -1554,6 +1590,14 @@ var GongmyungKanbanPlugin = class extends import_obsidian6.Plugin {
         const leaf = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView)?.leaf;
         if (!leaf) return;
         void this.tryOpenAsKanban(file);
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        for (const path of this.markdownOverrides) {
+          const found = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view.file?.path === path);
+          if (!found) this.markdownOverrides.delete(path);
+        }
       })
     );
     this.addCommand({
@@ -1576,6 +1620,7 @@ var GongmyungKanbanPlugin = class extends import_obsidian6.Plugin {
         const view = this.app.workspace.getActiveViewOfType(KanbanView);
         if (view) return false;
         if (checking) return true;
+        this.markdownOverrides.delete(file.path);
         const leaf = this.app.workspace.getMostRecentLeaf();
         if (leaf) {
           void leaf.setViewState({
@@ -1596,6 +1641,7 @@ var GongmyungKanbanPlugin = class extends import_obsidian6.Plugin {
         const leaf = view.leaf;
         const file = view.file;
         if (leaf && file) {
+          this.markdownOverrides.add(file.path);
           void leaf.setViewState({
             type: "markdown",
             state: { file: file.path }
@@ -1631,6 +1677,7 @@ var GongmyungKanbanPlugin = class extends import_obsidian6.Plugin {
     await this.saveData(this.settings);
   }
   async tryOpenAsKanban(file) {
+    if (this.markdownOverrides.has(file.path)) return;
     const cache = this.app.metadataCache.getFileCache(file);
     if (cache?.frontmatter?.["gongmyung-kanban"] !== "board") return;
     const leaf = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView)?.leaf;

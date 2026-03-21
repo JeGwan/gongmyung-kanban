@@ -1,6 +1,20 @@
 type LangKey = 'ko' | 'en';
 
 const strings: Record<string, Record<LangKey, string>> = {
+  // Action buttons
+  'action.archive': {
+    ko: '완료 카드 아카이브',
+    en: 'Archive completed cards',
+  },
+  'action.toggle_archive': {
+    ko: '아카이브 컬럼 토글',
+    en: 'Toggle archive column',
+  },
+  'action.toggle_markdown': {
+    ko: '문서 모드로 전환',
+    en: 'Open as markdown',
+  },
+
   // Notices
   'notice.wip_exceeded': {
     ko: '⚠️ WIP 제한 초과: {col} ({count}/{limit})',
