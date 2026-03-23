@@ -69,7 +69,7 @@ export function computeAging(card: Card, columnType: ColumnType): AgingInfo {
   let daysUntilDue: number | undefined;
   if (card.dueDate) {
     daysUntilDue = daysBetween(now, card.dueDate);
-    isOverdue = daysUntilDue < 0;
+    isOverdue = daysUntilDue < 0 && columnType !== 'done';
   }
 
   return { daysSinceCreated, daysInCurrentColumn, isOverdue, daysUntilDue };

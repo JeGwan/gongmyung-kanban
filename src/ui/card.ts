@@ -68,7 +68,10 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   if (settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== undefined) {
     hasFooter = true;
     const dueEl = el('span', { class: 'gk-card-due' });
-    if (aging.daysUntilDue > 3) {
+    if (ctx.columnType === 'done') {
+      // Done cards: just show the due date, no urgency/overdue styling
+      dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
+    } else if (aging.daysUntilDue > 3) {
       dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
     } else if (aging.daysUntilDue > 0) {
       dueEl.textContent = `D-${aging.daysUntilDue}`;

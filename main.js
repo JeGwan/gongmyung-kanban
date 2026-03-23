@@ -313,7 +313,7 @@ function computeAging(card, columnType) {
   let daysUntilDue;
   if (card.dueDate) {
     daysUntilDue = daysBetween(now, card.dueDate);
-    isOverdue = daysUntilDue < 0;
+    isOverdue = daysUntilDue < 0 && columnType !== "done";
   }
   return { daysSinceCreated, daysInCurrentColumn, isOverdue, daysUntilDue };
 }
@@ -386,7 +386,9 @@ async function renderCard(card, ctx) {
   if (settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== void 0) {
     hasFooter = true;
     const dueEl = el("span", { class: "gk-card-due" });
-    if (aging.daysUntilDue > 3) {
+    if (ctx.columnType === "done") {
+      dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
+    } else if (aging.daysUntilDue > 3) {
       dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
     } else if (aging.daysUntilDue > 0) {
       dueEl.textContent = `D-${aging.daysUntilDue}`;
