@@ -328,6 +328,7 @@
   outline: none;
   overflow: hidden;
   min-height: 28px;
+  field-sizing: content;
 }
 .gk-card-edit::placeholder {
   color: var(--text-faint);
