@@ -2,6 +2,7 @@ import { App, Component, MarkdownRenderer, setIcon } from 'obsidian';
 import { Board, Card, Column } from '../model';
 import { renderCard, CardRenderContext } from './card';
 import { el } from './components';
+import { createInlineEditor } from './editor';
 import { t } from '../i18n';
 import type { GKSettings } from '../settings';
 
@@ -94,44 +95,32 @@ async function renderHeaderMemo(
   }
   container.appendChild(previewEl);
 
-  // Edit mode (hidden initially)
-  const editEl = document.createElement('textarea');
-  editEl.className = 'gk-header-edit';
-  editEl.value = text;
-  editEl.placeholder = t('placeholder.header_memo');
-  editEl.style.display = 'none';
-  container.appendChild(editEl);
-
-  // Click preview → edit mode
+  // Click preview → CM6 editor
   previewEl.addEventListener('click', () => {
     previewEl.style.display = 'none';
-    editEl.style.display = 'block';
-    editEl.value = text;
-    editEl.focus();
-    // Auto-resize
-    editEl.style.height = 'auto';
-    editEl.style.height = editEl.scrollHeight + 'px';
-  });
 
-  // Blur/Esc → save & preview mode
-  const saveAndClose = () => {
-    const newText = editEl.value;
-    editEl.style.display = 'none';
-    previewEl.style.display = '';
-    if (newText !== text) {
-      callbacks.onHeaderTextChange(newText);
-    }
-  };
+    const editorEl = el('div', { class: 'gk-header-edit' });
+    container.appendChild(editorEl);
 
-  editEl.addEventListener('blur', saveAndClose);
-  editEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      editEl.value = text; // revert
-      saveAndClose();
-    }
-    // Auto-resize on input
-    editEl.style.height = 'auto';
-    editEl.style.height = editEl.scrollHeight + 'px';
+    const closeEditor = (newText?: string) => {
+      destroy();
+      editorEl.remove();
+      previewEl.style.display = '';
+      if (newText !== undefined && newText !== text) {
+        callbacks.onHeaderTextChange(newText);
+      }
+    };
+
+    const { view, destroy } = createInlineEditor(editorEl, {
+      initialValue: text,
+      placeholder: t('placeholder.header_memo'),
+      saveOnMetaEnter: true,
+      onSave: (val) => closeEditor(val),
+      onCancel: () => closeEditor(),
+      onBlur: (val) => closeEditor(val),
+    });
+
+    view.focus();
   });
 
   return container;

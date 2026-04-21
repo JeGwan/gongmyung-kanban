@@ -8,6 +8,9 @@
     "deploy": "npm run build && node scripts/deploy.mjs"
   },
   "devDependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.0",
     "@types/node": "^20.11.0",
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.24.0",

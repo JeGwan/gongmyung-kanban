@@ -64,30 +64,28 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   let hasFooter = false;
   const { settings } = ctx;
 
-  // Due date — always show if present (unless badge disabled)
-  if (settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== undefined) {
+  // Due date — if present, show countdown (D-X / D-Day / Xd overdue) and skip aging
+  const hasDue = settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== undefined;
+  if (hasDue) {
     hasFooter = true;
     const dueEl = el('span', { class: 'gk-card-due' });
     if (ctx.columnType === 'done') {
-      // Done cards: just show the due date, no urgency/overdue styling
-      dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
-    } else if (aging.daysUntilDue > 3) {
-      dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
-    } else if (aging.daysUntilDue > 0) {
+      dueEl.textContent = formatDueDate(card.dueDate!, settings.dateFormat);
+    } else if (aging.daysUntilDue! > 0) {
       dueEl.textContent = `D-${aging.daysUntilDue}`;
-      dueEl.classList.add('gk-due-urgent');
+      if (aging.daysUntilDue! <= 3) dueEl.classList.add('gk-due-urgent');
     } else if (aging.daysUntilDue === 0) {
       dueEl.textContent = 'D-Day';
       dueEl.classList.add('gk-due-urgent');
     } else {
-      dueEl.textContent = `${Math.abs(aging.daysUntilDue)}d overdue`;
+      dueEl.textContent = `${Math.abs(aging.daysUntilDue!)}d overdue`;
       dueEl.classList.add('gk-overdue');
     }
     footer.appendChild(dueEl);
   }
 
-  // Aging badge (for non-done cards)
-  if (settings.showAgingBadge && ctx.columnType !== 'done') {
+  // Aging badge — only when no due date (non-done cards)
+  if (!hasDue && settings.showAgingBadge && ctx.columnType !== 'done') {
     const days = aging.daysInCurrentColumn;
     if (days >= settings.agingCritical) {
       hasFooter = true;

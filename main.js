@@ -383,16 +383,15 @@ async function renderCard(card, ctx) {
   const footer = el("div", { class: "gk-card-footer" });
   let hasFooter = false;
   const { settings } = ctx;
-  if (settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== void 0) {
+  const hasDue = settings.showDueDateBadge && card.dueDate && aging.daysUntilDue !== void 0;
+  if (hasDue) {
     hasFooter = true;
     const dueEl = el("span", { class: "gk-card-due" });
     if (ctx.columnType === "done") {
       dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
-    } else if (aging.daysUntilDue > 3) {
-      dueEl.textContent = formatDueDate(card.dueDate, settings.dateFormat);
     } else if (aging.daysUntilDue > 0) {
       dueEl.textContent = `D-${aging.daysUntilDue}`;
-      dueEl.classList.add("gk-due-urgent");
+      if (aging.daysUntilDue <= 3) dueEl.classList.add("gk-due-urgent");
     } else if (aging.daysUntilDue === 0) {
       dueEl.textContent = "D-Day";
       dueEl.classList.add("gk-due-urgent");
@@ -402,7 +401,7 @@ async function renderCard(card, ctx) {
     }
     footer.appendChild(dueEl);
   }
-  if (settings.showAgingBadge && ctx.columnType !== "done") {
+  if (!hasDue && settings.showAgingBadge && ctx.columnType !== "done") {
     const days = aging.daysInCurrentColumn;
     if (days >= settings.agingCritical) {
       hasFooter = true;
@@ -436,6 +435,314 @@ function formatDueDate(date, format) {
     return `${parts[1]}/${parts[2]}`;
   }
   return date;
+}
+
+// src/ui/editor.ts
+var import_view = require("@codemirror/view");
+var import_state = require("@codemirror/state");
+var import_commands = require("@codemirror/commands");
+
+// src/ui/date-picker.ts
+var DatePicker = class {
+  containerEl;
+  selectedDate;
+  onSelect;
+  onClose;
+  constructor(opts) {
+    this.selectedDate = /* @__PURE__ */ new Date();
+    this.onSelect = opts.onSelect;
+    this.onClose = opts.onClose;
+    this.containerEl = el("div", { class: "gk-date-picker" });
+    const rect = opts.anchorEl.getBoundingClientRect();
+    this.containerEl.style.position = "fixed";
+    this.containerEl.style.left = `${rect.left}px`;
+    this.containerEl.style.top = `${rect.bottom + 4}px`;
+    this.containerEl.style.zIndex = "1000";
+    this.render();
+    document.body.appendChild(this.containerEl);
+    setTimeout(() => {
+      document.addEventListener("mousedown", this.handleOutsideClick);
+    }, 0);
+  }
+  handleOutsideClick = (e) => {
+    if (!this.containerEl.contains(e.target)) {
+      this.close();
+    }
+  };
+  render() {
+    this.containerEl.empty();
+    const year = this.selectedDate.getFullYear();
+    const month = this.selectedDate.getMonth();
+    const header = el("div", { class: "gk-dp-header" });
+    const prevBtn = el("button", { class: "gk-dp-nav", text: "\u2039" });
+    prevBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectedDate.setMonth(month - 1);
+      this.render();
+    });
+    header.appendChild(prevBtn);
+    const monthNames = ["1\uC6D4", "2\uC6D4", "3\uC6D4", "4\uC6D4", "5\uC6D4", "6\uC6D4", "7\uC6D4", "8\uC6D4", "9\uC6D4", "10\uC6D4", "11\uC6D4", "12\uC6D4"];
+    header.appendChild(el("span", { class: "gk-dp-title", text: `${year}\uB144 ${monthNames[month]}` }));
+    const nextBtn = el("button", { class: "gk-dp-nav", text: "\u203A" });
+    nextBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectedDate.setMonth(month + 1);
+      this.render();
+    });
+    header.appendChild(nextBtn);
+    this.containerEl.appendChild(header);
+    const dayLabels = el("div", { class: "gk-dp-days-header" });
+    for (const d of ["\uC77C", "\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0"]) {
+      dayLabels.appendChild(el("span", { class: "gk-dp-day-label", text: d }));
+    }
+    this.containerEl.appendChild(dayLabels);
+    const grid = el("div", { class: "gk-dp-grid" });
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today2 = /* @__PURE__ */ new Date();
+    const todayStr = this.formatDate(today2);
+    const selectedStr = this.formatDate(this.selectedDate);
+    for (let i = 0; i < firstDay; i++) {
+      grid.appendChild(el("span", { class: "gk-dp-cell gk-dp-empty" }));
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dateStr = this.formatDate(date);
+      const cell = el("button", { class: "gk-dp-cell", text: String(day) });
+      if (dateStr === todayStr) cell.classList.add("gk-dp-today");
+      if (dateStr === selectedStr) cell.classList.add("gk-dp-selected");
+      cell.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onSelect(dateStr);
+        this.close();
+      });
+      grid.appendChild(cell);
+    }
+    this.containerEl.appendChild(grid);
+    const quick = el("div", { class: "gk-dp-quick" });
+    const shortcuts = [
+      { label: "\uC624\uB298", days: 0 },
+      { label: "\uB0B4\uC77C", days: 1 },
+      { label: "\uC774\uBC88\uC8FC \uAE08", days: this.daysUntilFriday() },
+      { label: "\uB2E4\uC74C\uC8FC \uC6D4", days: this.daysUntilNextMonday() }
+    ];
+    for (const s of shortcuts) {
+      const btn = el("button", { class: "gk-dp-quick-btn", text: s.label });
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const d = /* @__PURE__ */ new Date();
+        d.setDate(d.getDate() + s.days);
+        this.onSelect(this.formatDate(d));
+        this.close();
+      });
+      quick.appendChild(btn);
+    }
+    this.containerEl.appendChild(quick);
+  }
+  handleKeydown(e) {
+    const day = this.selectedDate.getDate();
+    switch (e.key) {
+      case "ArrowLeft":
+        this.selectedDate.setDate(day - 1);
+        this.render();
+        return true;
+      case "ArrowRight":
+        this.selectedDate.setDate(day + 1);
+        this.render();
+        return true;
+      case "ArrowUp":
+        this.selectedDate.setDate(day - 7);
+        this.render();
+        return true;
+      case "ArrowDown":
+        this.selectedDate.setDate(day + 7);
+        this.render();
+        return true;
+      case "Enter":
+        this.onSelect(this.formatDate(this.selectedDate));
+        this.close();
+        return true;
+      case "Escape":
+        this.close();
+        return true;
+      default:
+        return false;
+    }
+  }
+  close() {
+    document.removeEventListener("mousedown", this.handleOutsideClick);
+    this.containerEl.remove();
+    this.onClose();
+  }
+  formatDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  daysUntilFriday() {
+    const today2 = (/* @__PURE__ */ new Date()).getDay();
+    return today2 <= 5 ? 5 - today2 : 5 + 7 - today2;
+  }
+  daysUntilNextMonday() {
+    const today2 = (/* @__PURE__ */ new Date()).getDay();
+    return today2 === 0 ? 1 : 8 - today2;
+  }
+};
+
+// src/ui/editor.ts
+function createInlineEditor(parent, opts) {
+  let datePicker = null;
+  let destroyed = false;
+  function closePicker() {
+    if (datePicker) {
+      datePicker.close();
+      datePicker = null;
+    }
+  }
+  const datePickerHandler = import_view.EditorView.domEventHandlers({
+    keydown(event, view2) {
+      if (datePicker) {
+        const handled = datePicker.handleKeydown(event);
+        if (handled) {
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+      }
+      if (event.key === "@" && !datePicker) {
+        requestAnimationFrame(() => {
+          const cursorPos = view2.state.selection.main.head;
+          datePicker = new DatePicker({
+            anchorEl: view2.dom,
+            onSelect: (dateStr) => {
+              const doc = view2.state.doc.toString();
+              const atPos = doc.lastIndexOf("@", cursorPos);
+              if (atPos >= 0) {
+                const replacement = `@{${dateStr}}`;
+                view2.dispatch({
+                  changes: { from: atPos, to: view2.state.selection.main.head, insert: replacement },
+                  selection: { anchor: atPos + replacement.length }
+                });
+              }
+              view2.focus();
+            },
+            onClose: () => {
+              datePicker = null;
+              view2.focus();
+            }
+          });
+        });
+      }
+      return false;
+    }
+  });
+  const pasteHandler = import_view.EditorView.domEventHandlers({
+    paste(event, view2) {
+      const clipText = event.clipboardData?.getData("text/plain") ?? "";
+      const { from, to } = view2.state.selection.main;
+      if (from === to) return false;
+      if (/^https?:\/\/\S+$/.test(clipText.trim())) {
+        event.preventDefault();
+        const selectedText = view2.state.sliceDoc(from, to);
+        const link = `[${selectedText}](${clipText.trim()})`;
+        view2.dispatch({
+          changes: { from, to, insert: link },
+          selection: { anchor: from + link.length }
+        });
+        return true;
+      }
+      return false;
+    }
+  });
+  const markdownKeymap = import_view.keymap.of([
+    { key: "Mod-b", run: (v) => wrapSelection(v, "**") },
+    { key: "Mod-i", run: (v) => wrapSelection(v, "*") }
+  ]);
+  const saveKeymap = import_view.keymap.of([
+    ...opts.saveOnEnter ? [{
+      key: "Enter",
+      run: (view2) => {
+        if (datePicker) return false;
+        closePicker();
+        opts.onSave(view2.state.doc.toString());
+        return true;
+      }
+    }] : [],
+    ...opts.saveOnMetaEnter ? [{
+      key: "Mod-Enter",
+      run: (view2) => {
+        closePicker();
+        opts.onSave(view2.state.doc.toString());
+        return true;
+      }
+    }] : [],
+    {
+      key: "Escape",
+      run: () => {
+        closePicker();
+        opts.onCancel();
+        return true;
+      }
+    }
+  ]);
+  const blurHandler = opts.onBlur ? import_view.EditorView.domEventHandlers({
+    focusout(_event, view2) {
+      setTimeout(() => {
+        if (!document.querySelector(".gk-date-picker") && !destroyed) {
+          opts.onBlur(view2.state.doc.toString());
+        }
+      }, 150);
+      return false;
+    }
+  }) : [];
+  const theme = import_view.EditorView.theme({
+    "&": { fontSize: "inherit", fontFamily: "inherit" },
+    "&.cm-focused": { outline: "none" },
+    ".cm-content": { padding: "0", caretColor: "var(--text-normal)" },
+    ".cm-line": { padding: "0" },
+    ".cm-cursor": { borderLeftColor: "var(--text-normal)" },
+    ".cm-placeholder": { color: "var(--text-faint)" }
+  });
+  const extensions = [
+    import_state.Prec.highest(datePickerHandler),
+    import_state.Prec.high(saveKeymap),
+    markdownKeymap,
+    (0, import_commands.history)(),
+    import_view.keymap.of([...import_commands.defaultKeymap, ...import_commands.historyKeymap]),
+    pasteHandler,
+    import_view.EditorView.lineWrapping,
+    theme,
+    ...opts.placeholder ? [(0, import_view.placeholder)(opts.placeholder)] : [],
+    ...Array.isArray(blurHandler) ? blurHandler : [blurHandler]
+  ];
+  const state = import_state.EditorState.create({
+    doc: opts.initialValue ?? "",
+    extensions
+  });
+  const view = new import_view.EditorView({ state, parent });
+  return {
+    view,
+    destroy: () => {
+      destroyed = true;
+      closePicker();
+      view.destroy();
+    }
+  };
+}
+function wrapSelection(view, wrapper) {
+  const { from, to } = view.state.selection.main;
+  if (from === to) return false;
+  const selected = view.state.sliceDoc(from, to);
+  view.dispatch({
+    changes: { from, to, insert: `${wrapper}${selected}${wrapper}` },
+    selection: { anchor: from + wrapper.length, head: to + wrapper.length }
+  });
+  return true;
 }
 
 // src/i18n.ts
@@ -695,36 +1002,27 @@ async function renderHeaderMemo(text, app, sourcePath, component, callbacks) {
     previewEl.textContent = t("placeholder.header_empty");
   }
   container.appendChild(previewEl);
-  const editEl = document.createElement("textarea");
-  editEl.className = "gk-header-edit";
-  editEl.value = text;
-  editEl.placeholder = t("placeholder.header_memo");
-  editEl.style.display = "none";
-  container.appendChild(editEl);
   previewEl.addEventListener("click", () => {
     previewEl.style.display = "none";
-    editEl.style.display = "block";
-    editEl.value = text;
-    editEl.focus();
-    editEl.style.height = "auto";
-    editEl.style.height = editEl.scrollHeight + "px";
-  });
-  const saveAndClose = () => {
-    const newText = editEl.value;
-    editEl.style.display = "none";
-    previewEl.style.display = "";
-    if (newText !== text) {
-      callbacks.onHeaderTextChange(newText);
-    }
-  };
-  editEl.addEventListener("blur", saveAndClose);
-  editEl.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      editEl.value = text;
-      saveAndClose();
-    }
-    editEl.style.height = "auto";
-    editEl.style.height = editEl.scrollHeight + "px";
+    const editorEl = el("div", { class: "gk-header-edit" });
+    container.appendChild(editorEl);
+    const closeEditor = (newText) => {
+      destroy();
+      editorEl.remove();
+      previewEl.style.display = "";
+      if (newText !== void 0 && newText !== text) {
+        callbacks.onHeaderTextChange(newText);
+      }
+    };
+    const { view, destroy } = createInlineEditor(editorEl, {
+      initialValue: text,
+      placeholder: t("placeholder.header_memo"),
+      saveOnMetaEnter: true,
+      onSave: (val) => closeEditor(val),
+      onCancel: () => closeEditor(),
+      onBlur: (val) => closeEditor(val)
+    });
+    view.focus();
   });
   return container;
 }
@@ -841,234 +1139,6 @@ function enableCardDrag(cardEl) {
     cardEl.classList.remove("gk-dragging");
     _dragTitle = "";
   });
-}
-
-// src/ui/date-picker.ts
-var DatePicker = class {
-  containerEl;
-  selectedDate;
-  onSelect;
-  onClose;
-  constructor(opts) {
-    this.selectedDate = /* @__PURE__ */ new Date();
-    this.onSelect = opts.onSelect;
-    this.onClose = opts.onClose;
-    this.containerEl = el("div", { class: "gk-date-picker" });
-    const rect = opts.anchorEl.getBoundingClientRect();
-    this.containerEl.style.position = "fixed";
-    this.containerEl.style.left = `${rect.left}px`;
-    this.containerEl.style.top = `${rect.bottom + 4}px`;
-    this.containerEl.style.zIndex = "1000";
-    this.render();
-    document.body.appendChild(this.containerEl);
-    setTimeout(() => {
-      document.addEventListener("mousedown", this.handleOutsideClick);
-    }, 0);
-  }
-  handleOutsideClick = (e) => {
-    if (!this.containerEl.contains(e.target)) {
-      this.close();
-    }
-  };
-  render() {
-    this.containerEl.empty();
-    const year = this.selectedDate.getFullYear();
-    const month = this.selectedDate.getMonth();
-    const header = el("div", { class: "gk-dp-header" });
-    const prevBtn = el("button", { class: "gk-dp-nav", text: "\u2039" });
-    prevBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.selectedDate.setMonth(month - 1);
-      this.render();
-    });
-    header.appendChild(prevBtn);
-    const monthNames = ["1\uC6D4", "2\uC6D4", "3\uC6D4", "4\uC6D4", "5\uC6D4", "6\uC6D4", "7\uC6D4", "8\uC6D4", "9\uC6D4", "10\uC6D4", "11\uC6D4", "12\uC6D4"];
-    header.appendChild(el("span", { class: "gk-dp-title", text: `${year}\uB144 ${monthNames[month]}` }));
-    const nextBtn = el("button", { class: "gk-dp-nav", text: "\u203A" });
-    nextBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.selectedDate.setMonth(month + 1);
-      this.render();
-    });
-    header.appendChild(nextBtn);
-    this.containerEl.appendChild(header);
-    const dayLabels = el("div", { class: "gk-dp-days-header" });
-    for (const d of ["\uC77C", "\uC6D4", "\uD654", "\uC218", "\uBAA9", "\uAE08", "\uD1A0"]) {
-      dayLabels.appendChild(el("span", { class: "gk-dp-day-label", text: d }));
-    }
-    this.containerEl.appendChild(dayLabels);
-    const grid = el("div", { class: "gk-dp-grid" });
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today2 = /* @__PURE__ */ new Date();
-    const todayStr = this.formatDate(today2);
-    const selectedStr = this.formatDate(this.selectedDate);
-    for (let i = 0; i < firstDay; i++) {
-      grid.appendChild(el("span", { class: "gk-dp-cell gk-dp-empty" }));
-    }
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = this.formatDate(date);
-      const cell = el("button", { class: "gk-dp-cell", text: String(day) });
-      if (dateStr === todayStr) cell.classList.add("gk-dp-today");
-      if (dateStr === selectedStr) cell.classList.add("gk-dp-selected");
-      cell.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.onSelect(dateStr);
-        this.close();
-      });
-      grid.appendChild(cell);
-    }
-    this.containerEl.appendChild(grid);
-    const quick = el("div", { class: "gk-dp-quick" });
-    const shortcuts = [
-      { label: "\uC624\uB298", days: 0 },
-      { label: "\uB0B4\uC77C", days: 1 },
-      { label: "\uC774\uBC88\uC8FC \uAE08", days: this.daysUntilFriday() },
-      { label: "\uB2E4\uC74C\uC8FC \uC6D4", days: this.daysUntilNextMonday() }
-    ];
-    for (const s of shortcuts) {
-      const btn = el("button", { class: "gk-dp-quick-btn", text: s.label });
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const d = /* @__PURE__ */ new Date();
-        d.setDate(d.getDate() + s.days);
-        this.onSelect(this.formatDate(d));
-        this.close();
-      });
-      quick.appendChild(btn);
-    }
-    this.containerEl.appendChild(quick);
-  }
-  handleKeydown(e) {
-    const day = this.selectedDate.getDate();
-    switch (e.key) {
-      case "ArrowLeft":
-        this.selectedDate.setDate(day - 1);
-        this.render();
-        return true;
-      case "ArrowRight":
-        this.selectedDate.setDate(day + 1);
-        this.render();
-        return true;
-      case "ArrowUp":
-        this.selectedDate.setDate(day - 7);
-        this.render();
-        return true;
-      case "ArrowDown":
-        this.selectedDate.setDate(day + 7);
-        this.render();
-        return true;
-      case "Enter":
-        this.onSelect(this.formatDate(this.selectedDate));
-        this.close();
-        return true;
-      case "Escape":
-        this.close();
-        return true;
-      default:
-        return false;
-    }
-  }
-  close() {
-    document.removeEventListener("mousedown", this.handleOutsideClick);
-    this.containerEl.remove();
-    this.onClose();
-  }
-  formatDate(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-  daysUntilFriday() {
-    const today2 = (/* @__PURE__ */ new Date()).getDay();
-    return today2 <= 5 ? 5 - today2 : 5 + 7 - today2;
-  }
-  daysUntilNextMonday() {
-    const today2 = (/* @__PURE__ */ new Date()).getDay();
-    return today2 === 0 ? 1 : 8 - today2;
-  }
-};
-
-// src/ui/editor.ts
-function autoResize(textarea) {
-  textarea.style.height = "auto";
-  textarea.style.height = textarea.scrollHeight + "px";
-}
-function setupEditableTextarea(textarea, opts) {
-  let datePicker = null;
-  const onInput = () => autoResize(textarea);
-  textarea.addEventListener("input", onInput);
-  requestAnimationFrame(() => autoResize(textarea));
-  const onKeydown = (e) => {
-    if (datePicker) {
-      const handled = datePicker.handleKeydown(e);
-      if (handled) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-    if (e.key === "@" && !datePicker) {
-      requestAnimationFrame(() => {
-        const cursorPos = textarea.selectionStart;
-        datePicker = new DatePicker({
-          anchorEl: textarea,
-          onSelect: (dateStr) => {
-            const val = textarea.value;
-            const atPos = val.lastIndexOf("@", cursorPos);
-            if (atPos >= 0) {
-              textarea.value = val.slice(0, atPos) + `@{${dateStr}}` + val.slice(cursorPos);
-              const newPos = atPos + dateStr.length + 3;
-              textarea.setSelectionRange(newPos, newPos);
-            }
-            textarea.focus();
-            autoResize(textarea);
-          },
-          onClose: () => {
-            datePicker = null;
-            textarea.focus();
-          }
-        });
-      });
-      return;
-    }
-    if (e.key === "Enter") {
-      if (opts.saveOnEnter && !e.shiftKey && !e.metaKey) {
-        e.preventDefault();
-        closePicker();
-        opts.onSave();
-      } else if (opts.saveOnMetaEnter && e.metaKey) {
-        e.preventDefault();
-        closePicker();
-        opts.onSave();
-      }
-      requestAnimationFrame(() => {
-        autoResize(textarea);
-        requestAnimationFrame(() => autoResize(textarea));
-      });
-    } else if (e.key === "Escape") {
-      closePicker();
-      opts.onCancel();
-    }
-  };
-  textarea.addEventListener("keydown", onKeydown);
-  function closePicker() {
-    if (datePicker) {
-      datePicker.close();
-      datePicker = null;
-    }
-  }
-  return () => {
-    closePicker();
-    textarea.removeEventListener("input", onInput);
-    textarea.removeEventListener("keydown", onKeydown);
-  };
 }
 
 // src/view.ts
@@ -1248,66 +1318,44 @@ var KanbanView = class extends import_obsidian3.TextFileView {
     if (!this.board) return;
     const colBody = this.contentEl.querySelectorAll(".gk-column-body")[colIdx];
     if (!colBody) return;
-    const textarea = document.createElement("textarea");
-    textarea.className = "gk-card-edit";
-    textarea.placeholder = t("placeholder.new_card");
-    colBody.insertBefore(textarea, colBody.firstChild);
-    textarea.focus();
+    const editorEl = document.createElement("div");
+    editorEl.className = "gk-card-edit";
+    colBody.insertBefore(editorEl, colBody.firstChild);
     let cleaned = false;
-    const cleanup = setupEditableTextarea(textarea, {
+    const saveNewCard = (text) => {
+      text = text.trim();
+      if (!cleaned) {
+        cleaned = true;
+        destroy();
+      }
+      editorEl.remove();
+      if (!text) return;
+      this.mutate((board) => {
+        const newCard = {
+          title: text,
+          checked: false,
+          body: [],
+          lifecycle: {},
+          tags: []
+        };
+        initLifecycle(newCard);
+        board.columns[colIdx]?.cards.unshift(newCard);
+      });
+    };
+    const { view, destroy } = createInlineEditor(editorEl, {
+      placeholder: t("placeholder.new_card"),
       saveOnEnter: true,
-      onSave: () => {
-        const text = textarea.value.trim();
-        if (!cleaned) {
-          cleaned = true;
-          cleanup();
-        }
-        textarea.remove();
-        if (!text) return;
-        this.mutate((board) => {
-          const newCard = {
-            title: text,
-            checked: false,
-            body: [],
-            lifecycle: {},
-            tags: []
-          };
-          initLifecycle(newCard);
-          board.columns[colIdx]?.cards.unshift(newCard);
-        });
-      },
+      onSave: saveNewCard,
       onCancel: () => {
         if (!cleaned) {
           cleaned = true;
-          cleanup();
+          destroy();
         }
-        textarea.remove();
-      }
+        editorEl.remove();
+      },
+      onBlur: saveNewCard
     });
-    textarea.addEventListener("blur", () => {
-      setTimeout(() => {
-        if (!document.querySelector(".gk-date-picker") && !cleaned) {
-          const text = textarea.value.trim();
-          if (!cleaned) {
-            cleaned = true;
-            cleanup();
-          }
-          textarea.remove();
-          if (!text) return;
-          this.mutate((board) => {
-            const newCard = {
-              title: text,
-              checked: false,
-              body: [],
-              lifecycle: {},
-              tags: []
-            };
-            initLifecycle(newCard);
-            board.columns[colIdx]?.cards.unshift(newCard);
-          });
-        }
-      }, 150);
-    });
+    view.focus();
   }
   startInlineEdit(colIdx, cardIdx, cardEl) {
     if (!this.board) return;
@@ -1316,15 +1364,12 @@ var KanbanView = class extends import_obsidian3.TextFileView {
     const originalHTML = cardEl.innerHTML;
     const fullText = card.title + (card.body.length > 0 ? "\n" + card.body.map((l) => l.replace(/^\t/, "")).join("\n") : "");
     cardEl.empty();
-    const textarea = document.createElement("textarea");
-    textarea.className = "gk-card-edit";
-    textarea.value = fullText;
-    cardEl.appendChild(textarea);
-    textarea.focus();
-    textarea.setSelectionRange(0, card.title.length);
+    const editorEl = document.createElement("div");
+    editorEl.className = "gk-card-edit";
+    cardEl.appendChild(editorEl);
     let cleaned = false;
-    const doSave = () => {
-      const text = textarea.value.trim();
+    const doSave = (text) => {
+      text = text.trim();
       if (!text) {
         cardEl.innerHTML = originalHTML;
         return;
@@ -1344,34 +1389,33 @@ var KanbanView = class extends import_obsidian3.TextFileView {
         }
       });
     };
-    const cleanup = setupEditableTextarea(textarea, {
+    const { view, destroy } = createInlineEditor(editorEl, {
+      initialValue: fullText,
       saveOnEnter: true,
-      onSave: () => {
+      onSave: (text) => {
         if (!cleaned) {
           cleaned = true;
-          cleanup();
+          destroy();
         }
-        doSave();
+        doSave(text);
       },
       onCancel: () => {
         if (!cleaned) {
           cleaned = true;
-          cleanup();
+          destroy();
         }
         cardEl.innerHTML = originalHTML;
+      },
+      onBlur: (text) => {
+        if (!cleaned) {
+          cleaned = true;
+          destroy();
+        }
+        doSave(text);
       }
     });
-    textarea.addEventListener("blur", () => {
-      setTimeout(() => {
-        if (!document.querySelector(".gk-date-picker") && !cleaned) {
-          if (!cleaned) {
-            cleaned = true;
-            cleanup();
-          }
-          doSave();
-        }
-      }, 150);
-    });
+    view.focus();
+    view.dispatch({ selection: { anchor: 0, head: card.title.length } });
   }
 };
 

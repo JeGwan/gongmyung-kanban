@@ -4,7 +4,7 @@ import { Board, Card } from './model';
 import { parseBoard, serializeBoard } from './parser';
 import { applyLifecycleTransition, initLifecycle } from './lifecycle';
 import { renderBoard, enableCardDrag, BoardCallbacks } from './ui/board';
-import { setupEditableTextarea } from './ui/editor';
+import { createInlineEditor } from './ui/editor';
 import { t } from './i18n';
 import type { GKSettings } from './settings';
 
@@ -240,63 +240,40 @@ export class KanbanView extends TextFileView {
     const colBody = this.contentEl.querySelectorAll('.gk-column-body')[colIdx];
     if (!colBody) return;
 
-    const textarea = document.createElement('textarea');
-    textarea.className = 'gk-card-edit';
-    textarea.placeholder = t('placeholder.new_card');
-
-    colBody.insertBefore(textarea, colBody.firstChild);
-    textarea.focus();
+    const editorEl = document.createElement('div');
+    editorEl.className = 'gk-card-edit';
+    colBody.insertBefore(editorEl, colBody.firstChild);
 
     let cleaned = false;
-    const cleanup = setupEditableTextarea(textarea, {
+    const saveNewCard = (text: string) => {
+      text = text.trim();
+      if (!cleaned) { cleaned = true; destroy(); }
+      editorEl.remove();
+      if (!text) return;
+      this.mutate(board => {
+        const newCard: Card = {
+          title: text,
+          checked: false,
+          body: [],
+          lifecycle: {},
+          tags: [],
+        };
+        initLifecycle(newCard);
+        board.columns[colIdx]?.cards.unshift(newCard);
+      });
+    };
+
+    const { view, destroy } = createInlineEditor(editorEl, {
+      placeholder: t('placeholder.new_card'),
       saveOnEnter: true,
-      onSave: () => {
-        const text = textarea.value.trim();
-        if (!cleaned) { cleaned = true; cleanup(); }
-        textarea.remove();
-        if (!text) return;
-
-        this.mutate(board => {
-          const newCard: Card = {
-            title: text,
-            checked: false,
-            body: [],
-            lifecycle: {},
-            tags: [],
-          };
-          initLifecycle(newCard);
-          board.columns[colIdx]?.cards.unshift(newCard);
-        });
-      },
+      onSave: saveNewCard,
       onCancel: () => {
-        if (!cleaned) { cleaned = true; cleanup(); }
-        textarea.remove();
+        if (!cleaned) { cleaned = true; destroy(); }
+        editorEl.remove();
       },
+      onBlur: saveNewCard,
     });
-
-    textarea.addEventListener('blur', () => {
-      // Small delay to allow date picker click
-      setTimeout(() => {
-        if (!document.querySelector('.gk-date-picker') && !cleaned) {
-          const text = textarea.value.trim();
-          if (!cleaned) { cleaned = true; cleanup(); }
-          textarea.remove();
-          if (!text) return;
-
-          this.mutate(board => {
-            const newCard: Card = {
-              title: text,
-              checked: false,
-              body: [],
-              lifecycle: {},
-              tags: [],
-            };
-            initLifecycle(newCard);
-            board.columns[colIdx]?.cards.unshift(newCard);
-          });
-        }
-      }, 150);
-    });
+    view.focus();
   }
 
   private startInlineEdit(colIdx: number, cardIdx: number, cardEl: HTMLElement): void {
@@ -308,17 +285,14 @@ export class KanbanView extends TextFileView {
     const fullText = card.title + (card.body.length > 0 ? '\n' + card.body.map(l => l.replace(/^\t/, '')).join('\n') : '');
 
     cardEl.empty();
-    const textarea = document.createElement('textarea');
-    textarea.className = 'gk-card-edit';
-    textarea.value = fullText;
-    cardEl.appendChild(textarea);
-    textarea.focus();
-    textarea.setSelectionRange(0, card.title.length);
+    const editorEl = document.createElement('div');
+    editorEl.className = 'gk-card-edit';
+    cardEl.appendChild(editorEl);
 
     let cleaned = false;
 
-    const doSave = () => {
-      const text = textarea.value.trim();
+    const doSave = (text: string) => {
+      text = text.trim();
       if (!text) {
         cardEl.innerHTML = originalHTML;
         return;
@@ -333,7 +307,6 @@ export class KanbanView extends TextFileView {
         if (!c) return;
         c.title = newTitle;
         c.body = newBody;
-        // Extract due date from edited text if @{YYYY-MM-DD} was added
         const dueDateMatch = text.match(/@\{(\d{4}-\d{2}-\d{2})\}/);
         if (dueDateMatch) {
           c.dueDate = dueDateMatch[1];
@@ -342,25 +315,24 @@ export class KanbanView extends TextFileView {
       });
     };
 
-    const cleanup = setupEditableTextarea(textarea, {
+    const { view, destroy } = createInlineEditor(editorEl, {
+      initialValue: fullText,
       saveOnEnter: true,
-      onSave: () => {
-        if (!cleaned) { cleaned = true; cleanup(); }
-        doSave();
+      onSave: (text) => {
+        if (!cleaned) { cleaned = true; destroy(); }
+        doSave(text);
       },
       onCancel: () => {
-        if (!cleaned) { cleaned = true; cleanup(); }
+        if (!cleaned) { cleaned = true; destroy(); }
         cardEl.innerHTML = originalHTML;
+      },
+      onBlur: (text) => {
+        if (!cleaned) { cleaned = true; destroy(); }
+        doSave(text);
       },
     });
 
-    textarea.addEventListener('blur', () => {
-      setTimeout(() => {
-        if (!document.querySelector('.gk-date-picker') && !cleaned) {
-          if (!cleaned) { cleaned = true; cleanup(); }
-          doSave();
-        }
-      }, 150);
-    });
+    view.focus();
+    view.dispatch({ selection: { anchor: 0, head: card.title.length } });
   }
 }
