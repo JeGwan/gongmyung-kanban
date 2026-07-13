@@ -306,6 +306,7 @@
   opacity: 0.15;
   border: 2px dashed var(--interactive-accent);
   border-radius: 6px;
+  box-sizing: border-box;
   flex-shrink: 0;
   padding: 6px 10px;
   font-size: 0.85em;
@@ -331,6 +332,20 @@
 }
 .gk-card-edit .cm-focused {
   outline: none;
+}
+.gk-card-edit.gk-card-edit-single-line .cm-content,
+.gk-card-edit.gk-card-edit-single-line .cm-line {
+  white-space: pre;
+}
+.gk-card-edit.gk-card-edit-single-line .cm-scroller {
+  overflow: hidden;
+}
+.gk-card-edit.gk-card-edit-single-line .cm-placeholder {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ─── Date Picker ─── */

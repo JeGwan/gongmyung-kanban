@@ -6,6 +6,7 @@ import { DatePicker } from './date-picker';
 export interface InlineEditorOptions {
   initialValue?: string;
   placeholder?: string;
+  singleLine?: boolean;
   onSave: (value: string) => void;
   onCancel: () => void;
   onBlur?: (value: string) => void;
@@ -152,12 +153,24 @@ export function createInlineEditor(
 
   // ── Theme (inherit kanban card styling, strip CM6 chrome) ──
   const theme = EditorView.theme({
-    '&': { fontSize: 'inherit', fontFamily: 'inherit' },
+    '&': { fontSize: 'inherit', fontFamily: 'inherit', lineHeight: '1.4' },
     '&.cm-focused': { outline: 'none' },
-    '.cm-content': { padding: '0', caretColor: 'var(--text-normal)' },
-    '.cm-line': { padding: '0' },
+    '.cm-scroller': opts.singleLine ? { overflow: 'hidden' } : {},
+    '.cm-content': opts.singleLine
+      ? { padding: '0', caretColor: 'var(--text-normal)', whiteSpace: 'pre' }
+      : { padding: '0', caretColor: 'var(--text-normal)' },
+    '.cm-line': opts.singleLine ? { padding: '0', whiteSpace: 'pre' } : { padding: '0' },
     '.cm-cursor': { borderLeftColor: 'var(--text-normal)' },
-    '.cm-placeholder': { color: 'var(--text-faint)' },
+    '.cm-placeholder': opts.singleLine
+      ? {
+          color: 'var(--text-faint)',
+          display: 'block',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }
+      : { color: 'var(--text-faint)' },
   });
 
   // ── Assemble extensions ──
@@ -168,7 +181,7 @@ export function createInlineEditor(
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     pasteHandler,
-    EditorView.lineWrapping,
+    ...(opts.singleLine ? [] : [EditorView.lineWrapping]),
     theme,
     ...(opts.placeholder ? [cmPlaceholder(opts.placeholder)] : []),
     ...(Array.isArray(blurHandler) ? blurHandler : [blurHandler]),

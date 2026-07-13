@@ -1,8 +1,9 @@
-import { App, Component, MarkdownRenderer, setIcon } from 'obsidian';
+import { App, Component, setIcon } from 'obsidian';
 import { Board, Card, Column } from '../model';
 import { renderCard, CardRenderContext } from './card';
 import { el } from './components';
 import { createInlineEditor } from './editor';
+import { isInteractiveTarget, renderMarkdown } from './markdown';
 import { t } from '../i18n';
 import type { GKSettings } from '../settings';
 
@@ -88,7 +89,7 @@ async function renderHeaderMemo(
   // Preview mode
   const previewEl = el('div', { class: 'gk-header-preview' });
   if (text.trim()) {
-    await MarkdownRenderer.render(app, text, previewEl, sourcePath, component);
+    await renderMarkdown(app, text, previewEl, sourcePath, component);
   } else {
     previewEl.classList.add('gk-header-empty');
     previewEl.textContent = t('placeholder.header_empty');
@@ -96,7 +97,9 @@ async function renderHeaderMemo(
   container.appendChild(previewEl);
 
   // Click preview → CM6 editor
-  previewEl.addEventListener('click', () => {
+  previewEl.addEventListener('click', (event) => {
+    if (isInteractiveTarget(event.target)) return;
+
     previewEl.style.display = 'none';
 
     const editorEl = el('div', { class: 'gk-header-edit' });
@@ -198,6 +201,7 @@ async function renderColumn(
 
 // Shared drag title for ghost card preview
 let _dragTitle = '';
+let _dragCardHeight = 36;
 
 function setupDropZone(bodyEl: HTMLElement, colIdx: number, callbacks: BoardCallbacks): void {
   bodyEl.addEventListener('dragover', (e: DragEvent) => {
@@ -214,6 +218,7 @@ function setupDropZone(bodyEl: HTMLElement, colIdx: number, callbacks: BoardCall
       if (title) ind.textContent = title;
       bodyEl.appendChild(ind);
     }
+    syncDropIndicatorSize(ind);
 
     // Position indicator
     const target = getDropTarget(bodyEl, e.clientY);
@@ -271,6 +276,11 @@ function getDropTarget(bodyEl: HTMLElement, clientY: number): HTMLElement | null
 // Call this on each card element after rendering to enable drag start
 export function enableCardDrag(cardEl: HTMLElement): void {
   cardEl.addEventListener('dragstart', (e: DragEvent) => {
+    if (isInteractiveTarget(e.target)) {
+      e.preventDefault();
+      return;
+    }
+
     if (!e.dataTransfer) return;
     e.dataTransfer.setData('text/x-gk-col', cardEl.dataset.colIndex ?? '');
     e.dataTransfer.setData('text/x-gk-card', cardEl.dataset.cardIndex ?? '');
@@ -279,6 +289,7 @@ export function enableCardDrag(cardEl: HTMLElement): void {
     // Store title for ghost preview
     const titleEl = cardEl.querySelector('.gk-card-title');
     _dragTitle = titleEl?.textContent?.trim() ?? '';
+    _dragCardHeight = Math.max(36, Math.ceil(cardEl.getBoundingClientRect().height));
     cardEl.classList.add('gk-dragging');
     requestAnimationFrame(() => cardEl.classList.add('gk-dragging'));
   });
@@ -286,5 +297,11 @@ export function enableCardDrag(cardEl: HTMLElement): void {
   cardEl.addEventListener('dragend', () => {
     cardEl.classList.remove('gk-dragging');
     _dragTitle = '';
+    _dragCardHeight = 36;
+    document.querySelectorAll('.gk-drop-indicator').forEach(ind => ind.remove());
   });
+}
+
+function syncDropIndicatorSize(indicator: HTMLElement): void {
+  indicator.style.height = `${_dragCardHeight}px`;
 }

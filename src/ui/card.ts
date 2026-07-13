@@ -1,7 +1,8 @@
-import { App, MarkdownRenderer, Component } from 'obsidian';
+import { App, Component } from 'obsidian';
 import { Card, ColumnType } from '../model';
 import { computeAging } from '../lifecycle';
 import { el, badge } from './components';
+import { isInteractiveTarget, renderMarkdown } from './markdown';
 import type { GKSettings } from '../settings';
 
 export interface CardRenderContext {
@@ -26,7 +27,7 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   const header = el('div', { class: 'gk-card-header' });
 
   const titleEl = el('div', { class: 'gk-card-title' });
-  await MarkdownRenderer.render(ctx.app, card.title, titleEl, ctx.sourcePath, ctx.component);
+  await renderMarkdown(ctx.app, card.title, titleEl, ctx.sourcePath, ctx.component);
   const p = titleEl.querySelector('p');
   if (p) {
     while (p.firstChild) titleEl.insertBefore(p.firstChild, p);
@@ -37,7 +38,7 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   // Source link — top of card, before title
   if (card.source) {
     const sourceEl = el('div', { class: 'gk-card-source' });
-    await MarkdownRenderer.render(ctx.app, `[[${card.source}]]`, sourceEl, ctx.sourcePath, ctx.component);
+    await renderMarkdown(ctx.app, `[[${card.source}]]`, sourceEl, ctx.sourcePath, ctx.component);
     cardEl.appendChild(sourceEl);
   }
 
@@ -55,7 +56,7 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
   if (bodyLines.length > 0) {
     const bodyEl = el('div', { class: 'gk-card-body' });
     const bodyText = bodyLines.map(l => l.replace(/^\t/, '')).join('\n');
-    await MarkdownRenderer.render(ctx.app, bodyText, bodyEl, ctx.sourcePath, ctx.component);
+    await renderMarkdown(ctx.app, bodyText, bodyEl, ctx.sourcePath, ctx.component);
     cardEl.appendChild(bodyEl);
   }
 
@@ -110,11 +111,13 @@ export async function renderCard(card: Card, ctx: CardRenderContext): Promise<HT
 
   // Event listeners
   cardEl.addEventListener('contextmenu', (e) => {
+    if (isInteractiveTarget(e.target)) return;
     e.preventDefault();
     ctx.onContextMenu(card, e);
   });
 
-  cardEl.addEventListener('dblclick', () => {
+  cardEl.addEventListener('dblclick', (e) => {
+    if (isInteractiveTarget(e.target)) return;
     ctx.onDblClick(card, cardEl);
   });
 

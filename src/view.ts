@@ -241,7 +241,7 @@ export class KanbanView extends TextFileView {
     if (!colBody) return;
 
     const editorEl = document.createElement('div');
-    editorEl.className = 'gk-card-edit';
+    editorEl.className = 'gk-card-edit gk-card-edit-single-line';
     colBody.insertBefore(editorEl, colBody.firstChild);
 
     let cleaned = false;
@@ -265,6 +265,7 @@ export class KanbanView extends TextFileView {
 
     const { view, destroy } = createInlineEditor(editorEl, {
       placeholder: t('placeholder.new_card'),
+      singleLine: true,
       saveOnEnter: true,
       onSave: saveNewCard,
       onCancel: () => {

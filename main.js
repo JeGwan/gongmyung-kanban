@@ -321,9 +321,6 @@ function computeAging(card, columnType) {
 // src/ui/board.ts
 var import_obsidian2 = require("obsidian");
 
-// src/ui/card.ts
-var import_obsidian = require("obsidian");
-
 // src/ui/components.ts
 function el(tag, attrs, children) {
   const elem = document.createElement(tag);
@@ -346,6 +343,46 @@ function badge(text, cls) {
   return el("span", { class: `gk-badge ${cls}`, text });
 }
 
+// src/ui/markdown.ts
+var import_obsidian = require("obsidian");
+var INTERACTIVE_SELECTOR = "a, button, input, textarea, select, .cm-editor, .gk-card-edit";
+async function renderMarkdown(app, markdown, container, sourcePath, component) {
+  await import_obsidian.MarkdownRenderer.render(app, markdown, container, sourcePath, component);
+  wireInternalLinks(app, container, sourcePath);
+}
+function isInteractiveTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return target.closest(INTERACTIVE_SELECTOR) !== null;
+}
+function wireInternalLinks(app, container, sourcePath) {
+  const links = container.querySelectorAll("a.internal-link");
+  links.forEach((link) => {
+    if (link.dataset.gkLinkBound === "true") return;
+    link.dataset.gkLinkBound = "true";
+    link.draggable = false;
+    link.addEventListener("click", (event) => {
+      openInternalLink(app, sourcePath, link, event);
+    });
+    link.addEventListener("auxclick", (event) => {
+      if (event.button === 1) openInternalLink(app, sourcePath, link, event);
+    });
+    link.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+    });
+    link.addEventListener("dragstart", (event) => {
+      event.preventDefault();
+    });
+  });
+}
+function openInternalLink(app, sourcePath, link, event) {
+  const linkText = link.getAttribute("data-href") ?? link.getAttribute("href") ?? link.textContent?.trim() ?? "";
+  if (!linkText || /^(https?|obsidian):/i.test(linkText)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  void app.workspace.openLinkText(linkText, sourcePath, import_obsidian.Keymap.isModEvent(event));
+}
+
 // src/ui/card.ts
 async function renderCard(card, ctx) {
   const cardEl = el("div", { class: "gk-card" });
@@ -354,7 +391,7 @@ async function renderCard(card, ctx) {
   if (aging.isOverdue) cardEl.classList.add("gk-overdue");
   const header = el("div", { class: "gk-card-header" });
   const titleEl = el("div", { class: "gk-card-title" });
-  await import_obsidian.MarkdownRenderer.render(ctx.app, card.title, titleEl, ctx.sourcePath, ctx.component);
+  await renderMarkdown(ctx.app, card.title, titleEl, ctx.sourcePath, ctx.component);
   const p = titleEl.querySelector("p");
   if (p) {
     while (p.firstChild) titleEl.insertBefore(p.firstChild, p);
@@ -363,7 +400,7 @@ async function renderCard(card, ctx) {
   header.appendChild(titleEl);
   if (card.source) {
     const sourceEl = el("div", { class: "gk-card-source" });
-    await import_obsidian.MarkdownRenderer.render(ctx.app, `[[${card.source}]]`, sourceEl, ctx.sourcePath, ctx.component);
+    await renderMarkdown(ctx.app, `[[${card.source}]]`, sourceEl, ctx.sourcePath, ctx.component);
     cardEl.appendChild(sourceEl);
   }
   cardEl.appendChild(header);
@@ -377,7 +414,7 @@ async function renderCard(card, ctx) {
   if (bodyLines.length > 0) {
     const bodyEl = el("div", { class: "gk-card-body" });
     const bodyText = bodyLines.map((l) => l.replace(/^\t/, "")).join("\n");
-    await import_obsidian.MarkdownRenderer.render(ctx.app, bodyText, bodyEl, ctx.sourcePath, ctx.component);
+    await renderMarkdown(ctx.app, bodyText, bodyEl, ctx.sourcePath, ctx.component);
     cardEl.appendChild(bodyEl);
   }
   const footer = el("div", { class: "gk-card-footer" });
@@ -421,10 +458,12 @@ async function renderCard(card, ctx) {
   }
   if (hasFooter) cardEl.appendChild(footer);
   cardEl.addEventListener("contextmenu", (e) => {
+    if (isInteractiveTarget(e.target)) return;
     e.preventDefault();
     ctx.onContextMenu(card, e);
   });
-  cardEl.addEventListener("dblclick", () => {
+  cardEl.addEventListener("dblclick", (e) => {
+    if (isInteractiveTarget(e.target)) return;
     ctx.onDblClick(card, cardEl);
   });
   return cardEl;
@@ -701,12 +740,20 @@ function createInlineEditor(parent, opts) {
     }
   }) : [];
   const theme = import_view.EditorView.theme({
-    "&": { fontSize: "inherit", fontFamily: "inherit" },
+    "&": { fontSize: "inherit", fontFamily: "inherit", lineHeight: "1.4" },
     "&.cm-focused": { outline: "none" },
-    ".cm-content": { padding: "0", caretColor: "var(--text-normal)" },
-    ".cm-line": { padding: "0" },
+    ".cm-scroller": opts.singleLine ? { overflow: "hidden" } : {},
+    ".cm-content": opts.singleLine ? { padding: "0", caretColor: "var(--text-normal)", whiteSpace: "pre" } : { padding: "0", caretColor: "var(--text-normal)" },
+    ".cm-line": opts.singleLine ? { padding: "0", whiteSpace: "pre" } : { padding: "0" },
     ".cm-cursor": { borderLeftColor: "var(--text-normal)" },
-    ".cm-placeholder": { color: "var(--text-faint)" }
+    ".cm-placeholder": opts.singleLine ? {
+      color: "var(--text-faint)",
+      display: "block",
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } : { color: "var(--text-faint)" }
   });
   const extensions = [
     import_state.Prec.highest(datePickerHandler),
@@ -715,7 +762,7 @@ function createInlineEditor(parent, opts) {
     (0, import_commands.history)(),
     import_view.keymap.of([...import_commands.defaultKeymap, ...import_commands.historyKeymap]),
     pasteHandler,
-    import_view.EditorView.lineWrapping,
+    ...opts.singleLine ? [] : [import_view.EditorView.lineWrapping],
     theme,
     ...opts.placeholder ? [(0, import_view.placeholder)(opts.placeholder)] : [],
     ...Array.isArray(blurHandler) ? blurHandler : [blurHandler]
@@ -996,13 +1043,14 @@ async function renderHeaderMemo(text, app, sourcePath, component, callbacks) {
   const container = el("div", { class: "gk-header-memo" });
   const previewEl = el("div", { class: "gk-header-preview" });
   if (text.trim()) {
-    await import_obsidian2.MarkdownRenderer.render(app, text, previewEl, sourcePath, component);
+    await renderMarkdown(app, text, previewEl, sourcePath, component);
   } else {
     previewEl.classList.add("gk-header-empty");
     previewEl.textContent = t("placeholder.header_empty");
   }
   container.appendChild(previewEl);
-  previewEl.addEventListener("click", () => {
+  previewEl.addEventListener("click", (event) => {
+    if (isInteractiveTarget(event.target)) return;
     previewEl.style.display = "none";
     const editorEl = el("div", { class: "gk-header-edit" });
     container.appendChild(editorEl);
@@ -1071,6 +1119,7 @@ async function renderColumn(col, colIdx, app, sourcePath, component, callbacks, 
   return colEl;
 }
 var _dragTitle = "";
+var _dragCardHeight = 36;
 function setupDropZone(bodyEl, colIdx, callbacks) {
   bodyEl.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -1082,6 +1131,7 @@ function setupDropZone(bodyEl, colIdx, callbacks) {
       if (title) ind.textContent = title;
       bodyEl.appendChild(ind);
     }
+    syncDropIndicatorSize(ind);
     const target = getDropTarget(bodyEl, e.clientY);
     if (target) {
       bodyEl.insertBefore(ind, target);
@@ -1125,6 +1175,10 @@ function getDropTarget(bodyEl, clientY) {
 }
 function enableCardDrag(cardEl) {
   cardEl.addEventListener("dragstart", (e) => {
+    if (isInteractiveTarget(e.target)) {
+      e.preventDefault();
+      return;
+    }
     if (!e.dataTransfer) return;
     e.dataTransfer.setData("text/x-gk-col", cardEl.dataset.colIndex ?? "");
     e.dataTransfer.setData("text/x-gk-card", cardEl.dataset.cardIndex ?? "");
@@ -1132,13 +1186,19 @@ function enableCardDrag(cardEl) {
     e.dataTransfer.effectAllowed = "move";
     const titleEl = cardEl.querySelector(".gk-card-title");
     _dragTitle = titleEl?.textContent?.trim() ?? "";
+    _dragCardHeight = Math.max(36, Math.ceil(cardEl.getBoundingClientRect().height));
     cardEl.classList.add("gk-dragging");
     requestAnimationFrame(() => cardEl.classList.add("gk-dragging"));
   });
   cardEl.addEventListener("dragend", () => {
     cardEl.classList.remove("gk-dragging");
     _dragTitle = "";
+    _dragCardHeight = 36;
+    document.querySelectorAll(".gk-drop-indicator").forEach((ind) => ind.remove());
   });
+}
+function syncDropIndicatorSize(indicator) {
+  indicator.style.height = `${_dragCardHeight}px`;
 }
 
 // src/view.ts
@@ -1319,7 +1379,7 @@ var KanbanView = class extends import_obsidian3.TextFileView {
     const colBody = this.contentEl.querySelectorAll(".gk-column-body")[colIdx];
     if (!colBody) return;
     const editorEl = document.createElement("div");
-    editorEl.className = "gk-card-edit";
+    editorEl.className = "gk-card-edit gk-card-edit-single-line";
     colBody.insertBefore(editorEl, colBody.firstChild);
     let cleaned = false;
     const saveNewCard = (text) => {
@@ -1344,6 +1404,7 @@ var KanbanView = class extends import_obsidian3.TextFileView {
     };
     const { view, destroy } = createInlineEditor(editorEl, {
       placeholder: t("placeholder.new_card"),
+      singleLine: true,
       saveOnEnter: true,
       onSave: saveNewCard,
       onCancel: () => {
