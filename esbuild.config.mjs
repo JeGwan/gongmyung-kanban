@@ -1,30 +1,11 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
-import { copyFileSync, existsSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const prod = process.argv[2] === "production";
 
-// Auto-deploy plugin files after each build
-function autoDeploy() {
-  return {
-    name: "auto-deploy",
-    setup(build) {
-      build.onEnd(() => {
-        const dest = join(__dirname, "..", "..", ".obsidian", "plugins", "gongmyung-kanban");
-        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
-        for (const f of ["main.js", "manifest.json", "styles.css"]) {
-          const src = join(__dirname, f);
-          if (existsSync(src)) copyFileSync(src, join(dest, f));
-        }
-        console.log("→ Deployed to .obsidian/plugins/gongmyung-kanban/");
-      });
-    },
-  };
-}
+// No deploy step: this repo lives at .obsidian/plugins/gongmyung-kanban,
+// so `outfile: "main.js"` already writes to the installed plugin.
 
 const context = await esbuild.context({
   banner: { js: "/* Gongmyung Kanban — bundled by esbuild */" },
@@ -55,7 +36,6 @@ const context = await esbuild.context({
   define: {
     "process.env.NODE_ENV": prod ? '"production"' : '"development"',
   },
-  plugins: [autoDeploy()],
 });
 
 if (prod) {

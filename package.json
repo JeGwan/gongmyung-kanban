@@ -4,8 +4,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production",
-    "deploy": "npm run build && node scripts/deploy.mjs"
+    "build": "node esbuild.config.mjs production"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.10.3",

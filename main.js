@@ -410,10 +410,12 @@ async function renderCard(card, ctx) {
     if (/^출처:/.test(trimmed)) return false;
     if (/^@\{\d{4}-\d{2}-\d{2}\}$/.test(trimmed)) return false;
     return true;
-  }).filter((line) => line.trim() !== "");
+  });
+  while (bodyLines.length > 0 && bodyLines[0].trim() === "") bodyLines.shift();
+  while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1].trim() === "") bodyLines.pop();
   if (bodyLines.length > 0) {
     const bodyEl = el("div", { class: "gk-card-body" });
-    const bodyText = bodyLines.map((l) => l.replace(/^\t/, "")).join("\n");
+    const bodyText = bodyLines.map((l) => l.replace(/^\t/, "")).join("\n").replace(/\n{3,}/g, "\n\n");
     await renderMarkdown(ctx.app, bodyText, bodyEl, ctx.sourcePath, ctx.component);
     cardEl.appendChild(bodyEl);
   }
